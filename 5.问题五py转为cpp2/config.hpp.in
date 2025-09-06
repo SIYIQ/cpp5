@@ -1,0 +1,77 @@
+#pragma once
+
+// 项目配置文件 - 由CMake生成
+
+#define HPADE_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define HPADE_VERSION_MINOR @PROJECT_VERSION_MINOR@ 
+#define HPADE_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define HPADE_VERSION_STRING "@PROJECT_VERSION@"
+
+// 编译时特性检测
+#cmakedefine01 HPADE_HAVE_OPENMP
+#cmakedefine01 HPADE_HAVE_MKL
+#cmakedefine01 HPADE_HAVE_AVX2
+#cmakedefine01 HPADE_HAVE_AVX512
+
+// 构建信息
+#define HPADE_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
+#define HPADE_COMPILER "@CMAKE_CXX_COMPILER_ID@"
+#define HPADE_BUILD_DATE "@BUILD_TIMESTAMP@"
+
+// 性能相关常量
+#define HPADE_DEFAULT_CACHE_SIZE 10000
+#define HPADE_DEFAULT_MEMORY_ALIGNMENT 64
+#define HPADE_SIMD_WIDTH 4
+
+// 算法默认参数
+#define HPADE_DEFAULT_POPULATION_MULTIPLIER 4
+#define HPADE_DEFAULT_MAX_ITERATIONS 1000
+#define HPADE_DEFAULT_TOLERANCE 1e-6
+#define HPADE_DEFAULT_MEMORY_SIZE 100
+
+namespace Config {
+    
+    // 版本信息
+    inline constexpr int version_major = HPADE_VERSION_MAJOR;
+    inline constexpr int version_minor = HPADE_VERSION_MINOR;
+    inline constexpr int version_patch = HPADE_VERSION_PATCH;
+    inline constexpr const char* version_string = HPADE_VERSION_STRING;
+    
+    // 特性标志
+    inline constexpr bool have_openmp = HPADE_HAVE_OPENMP;
+    inline constexpr bool have_mkl = HPADE_HAVE_MKL;
+    inline constexpr bool have_avx2 = HPADE_HAVE_AVX2;
+    inline constexpr bool have_avx512 = HPADE_HAVE_AVX512;
+    
+    // 性能配置
+    inline constexpr size_t default_cache_size = HPADE_DEFAULT_CACHE_SIZE;
+    inline constexpr size_t memory_alignment = HPADE_DEFAULT_MEMORY_ALIGNMENT;
+    inline constexpr int simd_width = HPADE_SIMD_WIDTH;
+    
+    // 算法配置
+    inline constexpr int default_population_multiplier = HPADE_DEFAULT_POPULATION_MULTIPLIER;
+    inline constexpr int default_max_iterations = HPADE_DEFAULT_MAX_ITERATIONS;
+    inline constexpr double default_tolerance = HPADE_DEFAULT_TOLERANCE;
+    inline constexpr int default_memory_size = HPADE_DEFAULT_MEMORY_SIZE;
+}
+
+// 调试宏
+#ifdef DEBUG_MODE
+#define HPADE_DEBUG(msg) std::cout << "[DEBUG] " << msg << std::endl
+#define HPADE_ASSERT(cond, msg) assert(cond && msg)
+#else
+#define HPADE_DEBUG(msg) ((void)0)
+#define HPADE_ASSERT(cond, msg) ((void)0)
+#endif
+
+// 性能测量宏
+#ifdef ENABLE_PROFILING
+#define HPADE_PROFILE_START(name) auto name##_start = std::chrono::high_resolution_clock::now()
+#define HPADE_PROFILE_END(name) \
+    auto name##_end = std::chrono::high_resolution_clock::now(); \
+    auto name##_duration = std::chrono::duration_cast<std::chrono::microseconds>(name##_end - name##_start); \
+    std::cout << "[PROFILE] " << #name << ": " << name##_duration.count() << " µs" << std::endl
+#else
+#define HPADE_PROFILE_START(name) ((void)0)
+#define HPADE_PROFILE_END(name) ((void)0)
+#endif
