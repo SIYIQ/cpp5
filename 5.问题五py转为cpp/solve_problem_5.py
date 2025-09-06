@@ -1,109 +1,86 @@
 # solve_problem_5.py
 import numpy as np
 import time
-from optimizer import ObscurationOptimizer
+from optimizer import GlobalOptimizer
 from config import *
 from utils import save_final_results_to_excel
-from boundary_calculator import find_max_effective_deploy_time
-# 导入新的分配器和威胁评估器
-from task_allocator import assign_tasks_by_threat
-from threat_assessor import assess_threat_weights
-
-class Problem5SubOptimizer(ObscurationOptimizer):
-    # ... (这个类完全不用修改) ...
-    def _parse_decision_variables(self, dv):
-        strategy = {}
-        dv_index = 0
-        sorted_uav_ids = sorted(self.uav_assignments.keys())
-        for uav_id in sorted_uav_ids:
-            num_grenades = self.uav_assignments[uav_id]
-            speed, angle = dv[dv_index : dv_index + 2]
-            dv_index += 2
-            uav_strat = {'speed': speed, 'angle': angle, 'grenades': []}
-            t_d1 = dv[dv_index]
-            t_f1 = dv[dv_index + 1]
-            uav_strat['grenades'].append({'t_deploy': t_d1, 't_fuse': t_f1})
-            dv_index += 2
-            last_td = t_d1
-            for i in range(num_grenades - 1):
-                delta_t = dv[dv_index]
-                t_f = dv[dv_index + 1]
-                current_td = last_td + delta_t
-                uav_strat['grenades'].append({'t_deploy': current_td, 't_fuse': t_f})
-                last_td = current_td
-                dv_index += 2
-            strategy[uav_id] = uav_strat
-        return strategy
-
 
 if __name__ == '__main__':
-    # --- 步骤 0: 威胁评估 ---
-    threat_weights = assess_threat_weights()
-    
-    # --- 步骤 1: 高层决策 (基于威胁权重) ---
-    assignments = assign_tasks_by_threat(threat_weights)
-    
-    all_results = {}
-    
-    # --- 步骤 2: 低层决策 (与之前相同) ---
-    for missile_id, uav_alloc in assignments.items():
-        if not uav_alloc: continue # 跳过未分配到资源的导弹
+    # --- 步骤 0: 定义问题空间 ---
+    ALL_UAV_IDS = list(UAVS_INITIAL.keys())
+    ALL_MISSILE_IDS = list(MISSILES_INITIAL.keys())
+    UAV_GRENADE_COUNTS = {u_id: 3 for u_id in ALL_UAV_IDS}
 
-        print("\n" + "="*60)
-        print(f"开始为导弹 {missile_id} (威胁权重: {threat_weights[missile_id]:.2f}) 优化拦截策略...")
-        print("分配的无人机及弹药: ", uav_alloc)
-        print("="*60)
+    print("="*70)
+    print("      全局协同策略优化 (问题五)")
+    print("  方法: 单一全局优化器 (differential_evolution)")
+    print("="*70)
 
-        # ... (动态构建边界的代码保持不变) ...
-        bounds = []
-        uav_ids_for_task = sorted(uav_alloc.keys())
-        print("--- 正在计算 t_deploy 的有效边界 ---")
-        for uav_id in uav_ids_for_task:
-            num_grenades = uav_alloc[uav_id]
-            t_max = find_max_effective_deploy_time(uav_id, missile_id)
-            print(f"  {uav_id} 的 t_deploy 上边界建议为: {t_max:.2f} s")
-            bounds.extend([(UAV_SPEED_MIN, UAV_SPEED_MAX), (0, 2 * np.pi)])
-            bounds.extend([(0.1, t_max), (0.1, 20.0)])
-            for _ in range(num_grenades - 1):
-                bounds.extend([(GRENADE_INTERVAL, 10.0), (0.1, 20.0)])
-        print("-----------------------------------")
-        
-        optimizer = Problem5SubOptimizer(missile_id=missile_id, uav_assignments=uav_alloc)
-        D = len(bounds)
-        print(f"该子问题的优化维度为: {D}")
-        solver_options = {'popsize': 15 * D, 'maxiter': 1000, 'tol': 0.01, 'disp': True, 'workers': -1}
-        
-        start_time = time.time()
-        optimal_strategy, max_time = optimizer.solve(bounds, **solver_options)
-        end_time = time.time()
-        
-        print(f"\n对 {missile_id} 的优化完成，耗时: {end_time - start_time:.2f} 秒。")
-        print(f"最大有效遮蔽时间: {max_time:.4f} s")
-        
-        all_results[missile_id] = {'strategy': optimal_strategy, 'time': max_time}
+    # --- 步骤 1: 定义威胁权重 ---
+    # 由于不再使用 threat_assessor，我们为所有导弹设置均等权重。
+    print("\n--- 正在定义威胁权重 ---")
+    num_missiles = len(ALL_MISSILE_IDS)
+    threat_weights = {m_id: 1.0 / num_missiles for m_id in ALL_MISSILE_IDS}
+    for m_id, weight in threat_weights.items():
+        print(f"  - 导弹 {m_id} 的威胁权重 (均等): {weight:.3f}")
+    print("--------------------------")
 
-    # --- 步骤 3: 汇总、加权评分并保存结果 ---
-    print("\n" + "="*60)
-    print("所有优化任务完成，正在生成最终报告...")
-    print("="*60)
+    # --- 步骤 2: 构建全局优化问题的边界 (Bounds) ---
+    bounds = []
+    sorted_uav_ids = sorted(ALL_UAV_IDS)
     
-    total_weighted_score = 0
-    
-    for missile_id, result in all_results.items():
-        weight = threat_weights[missile_id]
-        time = result['time']
-        total_weighted_score += weight * time
+    for uav_id in sorted_uav_ids:
+        num_grenades = UAV_GRENADE_COUNTS[uav_id]
         
-        print(f"\n--- 导弹 {missile_id} 的最优策略 (遮蔽时间: {result['time']:.2f}s, 权重: {weight:.2f}) ---")
-        # ... (打印策略详情的代码保持不变) ...
-        for uav_id, uav_strat in result['strategy'].items():
-            print(f"  UAV: {uav_id}")
-            print(f"    飞行: speed={uav_strat['speed']:.2f}, angle={uav_strat['angle']:.2f}")
-            for i, g in enumerate(uav_strat['grenades']):
-                print(f"    弹药 {i+1}: t_deploy={g['t_deploy']:.2f}s, t_fuse={g['t_fuse']:.2f}s")
-    
-    print("\n" + "="*60)
-    print(f"最终防御策略的加权综合得分: {total_weighted_score:.4f}")
-    print("="*60)
+        bounds.extend([
+            (UAV_SPEED_MIN, UAV_SPEED_MAX), 
+            (0, 2 * np.pi)
+        ])
+        
+        for i in range(num_grenades):
+            if i == 0:
+                bounds.append((0.1, 30.0))
+            else:
+                bounds.append((GRENADE_INTERVAL, 15.0))
+            
+            bounds.append((0.1, 20.0))
+            bounds.append((0.0, 1.0))
 
-    save_final_results_to_excel('result3.xlsx', all_results)
+    # --- 步骤 3: 实例化并运行全局优化器 ---
+    optimizer = GlobalOptimizer(
+        uav_ids=ALL_UAV_IDS,
+        missile_ids=ALL_MISSILE_IDS,
+        threat_weights=threat_weights,
+        uav_grenade_counts=UAV_GRENADE_COUNTS
+    )
+
+    D = len(bounds)
+    print(f"\n全局优化问题维度: {D}")
+    solver_options = {
+        'popsize': 20 * D,
+        'maxiter': 1500,
+        'tol': 0.01, 
+        'disp': True, 
+        'workers': -1
+    }
+    
+    print("--- 开始使用差分进化算法求解全局最优策略 ---")
+    start_time = time.time()
+    optimal_strategy, max_score = optimizer.solve(bounds, **solver_options)
+    end_time = time.time() 
+    print("--------------------------------------------")
+
+    # --- 步骤 4: 展示和保存结果 ---
+    print(f"\n优化完成，耗时: {end_time - start_time:.2f} 秒。")
+    print(f"找到的最优策略的加权综合得分: {max_score:.4f}")
+    print("="*70)
+
+    print("\n--- 全局最优协同策略详情 ---")
+    for uav_id, uav_strat in optimal_strategy.items():
+        print(f"  UAV: {uav_id}")
+        print(f"    飞行策略: speed = {uav_strat['speed']:.2f} m/s, angle = {np.degrees(uav_strat['angle']):.2f}°")
+        for i, g in enumerate(uav_strat['grenades']):
+            print(f"    - 弹药 {i+1}: t_deploy={g['t_deploy']:.2f}s, t_fuse={g['t_fuse']:.2f}s -> 目标: {g['target_missile']}")
+    print("---------------------------------")
+
+    save_final_results_to_excel('result_global_optimal.xlsx', optimal_strategy)
