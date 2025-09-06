@@ -75,7 +75,7 @@ int main() {
     int D = lower_bounds.size();
     std::cout << "\nGlobal optimization dimension: " << D << std::endl;
     int pop_size = 20 * D;
-    int max_eval = 1500; // Reduced for quicker testing, increase for better results
+    int max_eval = 500; // Increased for a more thorough search
 
     auto start_time = std::chrono::high_resolution_clock::now();
     auto [optimal_strategy, max_score] = optimizer.solve(lower_bounds, upper_bounds, pop_size, max_eval);

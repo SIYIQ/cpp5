@@ -140,17 +140,14 @@ std::pair<GlobalStrategy, double> GlobalOptimizer::solve(
     int max_eval) 
 {
     unsigned int dim = lower_bounds.size();
-    nlopt::opt opt(nlopt::GN_MLSL_LDS, dim); // Using MLSL with LDS for global optimization
+    nlopt::opt opt(nlopt::GN_ESCH, dim); // Using Evolutionary Strategy
 
     opt.set_lower_bounds(lower_bounds);
     opt.set_upper_bounds(upper_bounds);
 
     opt.set_min_objective(GlobalOptimizer::objective_function_wrapper, this);
     
-    // Set a local optimizer for MLSL
-    nlopt::opt local_opt(nlopt::LN_BOBYQA, dim);
-    local_opt.set_xtol_rel(1.0e-4);
-    opt.set_local_optimizer(local_opt);
+    // ESCH does not use a local optimizer, so the related code is removed.
 
     opt.set_population(population_size);
     opt.set_maxeval(max_eval);
