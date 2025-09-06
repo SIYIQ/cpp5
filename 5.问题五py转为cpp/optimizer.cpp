@@ -28,23 +28,42 @@ GlobalOptimizer::GlobalOptimizer(
     }
 }
 
-// Static wrapper function to be passed to NLopt
-double GlobalOptimizer::objective_function_wrapper(unsigned n, const double *x, double *grad, void *data) {
-    // Cast the user data back to a pointer to the GlobalOptimizer instance
-    GlobalOptimizer* optimizer = static_cast<GlobalOptimizer*>(data);
-    // Call the actual implementation
-    return optimizer->objective_function_impl(n, x);
+// --- Public Methods ---
+
+std::pair<GlobalStrategy, double> GlobalOptimizer::solve(
+    const std::vector<double>& lower_bounds,
+    const std::vector<double>& upper_bounds,
+    int population_size,
+    int max_eval) 
+{
+    unsigned int dim = lower_bounds.size();
+    nlopt::opt opt(nlopt::GN_ESCH, dim);
+
+    opt.set_lower_bounds(lower_bounds);
+    opt.set_upper_bounds(upper_bounds);
+
+    opt.set_min_objective(GlobalOptimizer::objective_function_wrapper, this);
+    
+    opt.set_population(population_size);
+    opt.set_maxeval(max_eval);
+
+    std::vector<double> x = lower_bounds;
+    double min_f;
+
+    std::cout << "Starting NLopt optimization..." << std::endl;
+    nlopt::result result = opt.optimize(x, min_f);
+    std::cout << "NLopt optimization finished." << std::endl;
+
+    GlobalStrategy best_strategy = parse_decision_variables(x);
+    double max_score = -min_f;
+
+    return {best_strategy, max_score};
 }
 
-// Implementation of the objective function logic
-double GlobalOptimizer::objective_function_impl(unsigned n, const double *x) {
-    std::vector<double> dv(x, x + n);
-    GlobalStrategy strategy;
-    try {
-        strategy = parse_decision_variables(dv);
-    } catch (const std::out_of_range& e) {
-        // Invalid index access during parsing
-        return 1e9; // Return a large penalty
+std::map<std::string, double> GlobalOptimizer::calculate_strategy_details(const GlobalStrategy& strategy) {
+    std::map<std::string, double> total_obscured_time_per_missile;
+    for(const auto& id : missile_ids_) {
+        total_obscured_time_per_missile[id] = 0.0;
     }
 
     std::vector<SmokeCloud> all_smoke_clouds;
@@ -65,12 +84,7 @@ double GlobalOptimizer::objective_function_impl(unsigned n, const double *x) {
     }
 
     if (all_smoke_clouds.empty()) {
-        return 1e9;
-    }
-
-    std::map<std::string, double> total_obscured_time_per_missile;
-    for(const auto& id : missile_ids_) {
-        total_obscured_time_per_missile[id] = 0.0;
+        return total_obscured_time_per_missile;
     }
 
     for (double t = min_start_time; t < max_end_time; t += time_step_) {
@@ -84,9 +98,7 @@ double GlobalOptimizer::objective_function_impl(unsigned n, const double *x) {
                 }
             }
 
-            if (active_cloud_centers_for_missile.empty()) {
-                continue;
-            }
+            if (active_cloud_centers_for_missile.empty()) continue;
 
             Eigen::Vector3d missile_pos = missiles_.at(missile_id).get_position(t);
             if (check_collective_obscuration(missile_pos, active_cloud_centers_for_missile, target_.get_key_points())) {
@@ -94,13 +106,33 @@ double GlobalOptimizer::objective_function_impl(unsigned n, const double *x) {
             }
         }
     }
+    return total_obscured_time_per_missile;
+}
+
+// --- Private Methods ---
+
+double GlobalOptimizer::objective_function_wrapper(unsigned n, const double *x, double *grad, void *data) {
+    GlobalOptimizer* optimizer = static_cast<GlobalOptimizer*>(data);
+    return optimizer->objective_function_impl(n, x);
+}
+
+double GlobalOptimizer::objective_function_impl(unsigned n, const double *x) {
+    std::vector<double> dv(x, x + n);
+    GlobalStrategy strategy;
+    try {
+        strategy = parse_decision_variables(dv);
+    } catch (const std::out_of_range& e) {
+        return 1e9;
+    }
+
+    auto obscured_times = calculate_strategy_details(strategy);
 
     double total_weighted_score = 0.0;
-    for (const auto& [missile_id, obs_time] : total_obscured_time_per_missile) {
+    for (const auto& [missile_id, obs_time] : obscured_times) {
         total_weighted_score += threat_weights_.at(missile_id) * obs_time;
     }
 
-    return -total_weighted_score; // NLopt minimizes, so we return the negative score
+    return -total_weighted_score;
 }
 
 GlobalStrategy GlobalOptimizer::parse_decision_variables(const std::vector<double>& dv) const {
@@ -131,36 +163,4 @@ GlobalStrategy GlobalOptimizer::parse_decision_variables(const std::vector<doubl
         strategy[uav_id] = uav_strat;
     }
     return strategy;
-}
-
-std::pair<GlobalStrategy, double> GlobalOptimizer::solve(
-    const std::vector<double>& lower_bounds,
-    const std::vector<double>& upper_bounds,
-    int population_size,
-    int max_eval) 
-{
-    unsigned int dim = lower_bounds.size();
-    nlopt::opt opt(nlopt::GN_ESCH, dim); // Using Evolutionary Strategy
-
-    opt.set_lower_bounds(lower_bounds);
-    opt.set_upper_bounds(upper_bounds);
-
-    opt.set_min_objective(GlobalOptimizer::objective_function_wrapper, this);
-    
-    // ESCH does not use a local optimizer, so the related code is removed.
-
-    opt.set_population(population_size);
-    opt.set_maxeval(max_eval);
-
-    std::vector<double> x = lower_bounds; // Initial guess
-    double min_f;
-
-    std::cout << "Starting NLopt optimization..." << std::endl;
-    nlopt::result result = opt.optimize(x, min_f);
-    std::cout << "NLopt optimization finished." << std::endl;
-
-    GlobalStrategy best_strategy = parse_decision_variables(x);
-    double max_score = -min_f;
-
-    return {best_strategy, max_score};
 }

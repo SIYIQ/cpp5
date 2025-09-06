@@ -75,7 +75,7 @@ int main() {
     int D = lower_bounds.size();
     std::cout << "\nGlobal optimization dimension: " << D << std::endl;
     int pop_size = 20 * D;
-    int max_eval = 500; // Increased for a more thorough search
+    int max_eval = 5000; // Increased for a more thorough search
 
     auto start_time = std::chrono::high_resolution_clock::now();
     auto [optimal_strategy, max_score] = optimizer.solve(lower_bounds, upper_bounds, pop_size, max_eval);
@@ -87,6 +87,15 @@ int main() {
     std::cout << "\nOptimization finished in: " << std::fixed << std::setprecision(2) << elapsed.count() << " seconds." << std::endl;
     std::cout << "Found optimal strategy with weighted score: " << std::fixed << std::setprecision(4) << max_score << std::endl;
     std::cout << std::string(70, '=') << std::endl;
+
+    // --- 步骤 5: 计算并展示最优策略的详细结果 ---
+    auto obscuration_times = optimizer.calculate_strategy_details(optimal_strategy);
+    std::cout << "\n--- Obscuration Time per Missile ---" << std::endl;
+    for(const auto& [missile_id, time] : obscuration_times) {
+        std::cout << "  - " << missile_id << ": " << std::fixed << std::setprecision(2) << time << " seconds" << std::endl;
+    }
+    std::cout << "------------------------------------" << std::endl;
+
 
     std::cout << "\n--- Global Optimal Collaborative Strategy Details ---" << std::endl;
     for (const auto& [uav_id, uav_strat] : optimal_strategy) {

@@ -43,6 +43,9 @@ public:
         int max_eval
     );
 
+    // Public method to calculate details for a given strategy
+    std::map<std::string, double> calculate_strategy_details(const GlobalStrategy& strategy);
+
     // Public static wrapper for the NLopt C-style callback
     static double objective_function_wrapper(unsigned n, const double *x, double *grad, void *data);
 
