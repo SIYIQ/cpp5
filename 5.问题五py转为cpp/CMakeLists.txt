@@ -12,8 +12,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 1. 查找 Eigen 库
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
-# 2. 查找 Boost 库
-find_package(Boost 1.71 REQUIRED COMPONENTS system)
+# 2. 查找 Boost 库 (只查找头文件，不查找具体组件)
+find_package(Boost REQUIRED)
 
 # 3. 查找 NLopt 库
 find_package(NLopt REQUIRED)
@@ -37,8 +37,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${Boost_INCLUDE_DIRS}
     ${NLOPT_INCLUDE_DIRS}
 )
+# 移除了 Boost::system，因为 odeint 是纯头文件库
 target_link_libraries(${PROJECT_NAME} PRIVATE 
-    Boost::system
     ${NLOPT_LIBRARIES}
 )
 

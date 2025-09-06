@@ -1,0 +1,3 @@
+/Users/hhzjh/gemini-cli/cpp5/5.问题五py转为cpp/build/CMakeFiles/Problem5_Solver.dir
+/Users/hhzjh/gemini-cli/cpp5/5.问题五py转为cpp/build/CMakeFiles/edit_cache.dir
+/Users/hhzjh/gemini-cli/cpp5/5.问题五py转为cpp/build/CMakeFiles/rebuild_cache.dir

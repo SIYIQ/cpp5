@@ -1,4 +1,4 @@
-"""#ifndef CONFIG_HPP
+#ifndef CONFIG_HPP
 #define CONFIG_HPP
 
 #include <string>
@@ -62,4 +62,3 @@ inline const std::map<std::string, UavSpec>& get_uavs_initial() {
 }
 
 #endif // CONFIG_HPP
-""
